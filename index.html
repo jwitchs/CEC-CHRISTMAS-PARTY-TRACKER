@@ -15,21 +15,14 @@
     <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- FIREBASE SDKs (Required for syncing) -->
+    <!-- FIREBASE SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .setup-guide {
-            background-color: #fff;
-            border-left: 4px solid #f59e0b;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -38,19 +31,23 @@
 
     <script type="text/babel">
         // --- PASTE YOUR FIREBASE CONFIG HERE ---
-        // 1. Go to console.firebase.google.com
-        // 2. Create a project -> Add Web App (</>) -> Copy config
-        // 3. Go to "Build" -> "Firestore Database" -> "Create Database" -> "Start in Test Mode"
-        // 4. Paste the config below:
+        // REMINDER: When you update the code, you must PASTE YOUR KEYS HERE AGAIN!
         const firebaseConfig = {
-           apiKey: "AIzaSyCa0fXdn9G4pKLGU7ZfQjjO1MizhaXUPZo",
+          apiKey: "AIzaSyCa0fXdn9G4pKLGU7ZfQjjO1MizhaXUPZo",
           authDomain: "cec-party.firebaseapp.com",
           projectId: "cec-party",
           storageBucket: "cec-party.firebasestorage.app",
           messagingSenderId: "257743233938",
           appId: "1:257743233938:web:f38d4a0409e987f30bd74b",
           measurementId: "G-CNH0NVN1MJ"
-        };
+};
+
+        // --- ADMIN SETUP ---
+        // ADD YOUR ADMIN EMAILS HERE (Comma separated)
+        const ADMIN_EMAILS = [
+            "jerichwitch@gmail.com",
+            "23800020@usc.edu.ph"
+        ]; 
 
         // Initialize Firebase
         if (!firebase.apps.length) {
@@ -61,14 +58,16 @@
             }
         }
         
-        // Safe database reference initialization
         let db = null;
+        let auth = null;
         let docRef = null;
+        
         try {
             db = firebase.firestore();
+            auth = firebase.auth();
             docRef = db.collection("events").doc("cec_christmas_party");
         } catch (e) {
-            console.warn("Firestore could not be initialized yet (likely due to missing config).");
+            console.warn("Firebase init failed.");
         }
 
         // --- ICONS ---
@@ -79,6 +78,9 @@
         const IconUsers = ({ size = 20, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>);
         const IconCloud = ({ size = 20 }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>);
         const IconAlert = ({ size = 20 }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>);
+        const IconLock = ({ size = 20 }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>);
+        const IconUnlock = ({ size = 20 }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>);
+        const IconGoogle = ({ size = 20 }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>);
 
         // --- APP LOGIC ---
 
@@ -93,44 +95,25 @@
           "Ma Alexie Aguilar", "Jacob Malazarte", "Maverick Gabrielle", "Amiel Zachary Embrace", "Jamboy Gonzalo",
           "Ma Kate John Borgonia", "Bea Uy", "Elijah Espadilla", "Isaiah David", "Sophia Nandini",
           "Raymond Tabuelog Magdalan", "Marlon Ociel", "Michael Cebrian", "Ashley Britz Chua", "Adrian James Yap",
-          "Silvien Libatan"
+          "Silvien Libatan",
+          "Larra Cabanding", "Haggai Balatero", "Geah Jane Compra", "Laurianna Bagastos"
         ];
 
-        // Ensure we have a stable ID for everyone based on name
-        const initialParticipants = rawList.map((name, index) => ({ 
-            id: index, 
-            name, 
-            paid: false 
-        }));
+        const initialParticipants = rawList.map((name, index) => ({ id: index, name, paid: false }));
 
         function ConfigScreen() {
             return (
                 <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
                     <div className="bg-white p-8 rounded-xl shadow-xl max-w-lg w-full">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="p-3 bg-amber-100 rounded-full">
-                                <IconAlert size={32} />
-                            </div>
+                            <div className="p-3 bg-amber-100 rounded-full"><IconAlert size={32} /></div>
                             <h1 className="text-2xl font-bold text-gray-800">Setup Required</h1>
                         </div>
-                        
-                        <p className="text-gray-600 mb-6 leading-relaxed">
-                            The app is running, but it cannot connect to the cloud because the <b>API Configuration</b> is missing or incorrect.
-                        </p>
-
-                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg mb-6">
-                            <h3 className="font-bold text-blue-900 mb-2 text-sm uppercase">How to fix this:</h3>
-                            <ol className="list-decimal pl-5 space-y-2 text-sm text-blue-800">
-                                <li>Open this file (index.html) in a text editor (Notepad, VS Code, etc).</li>
-                                <li>Find the <code>const firebaseConfig</code> section near the top.</li>
-                                <li>Replace the placeholder values with your real Firebase Project Config.</li>
-                                <li>Make sure you enabled <b>Firestore Database</b> in "Test Mode" in the Firebase Console.</li>
-                            </ol>
+                        <p className="text-gray-600 mb-6">The app needs your Firebase Configuration to work.</p>
+                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg mb-6 text-sm text-blue-800">
+                            <b>Action Needed:</b> Edit the code and paste your <code>firebaseConfig</code> (apiKey, projectId, etc.) into the code.
                         </div>
-
-                        <button onClick={() => window.location.reload()} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">
-                            I updated the code, Reload now
-                        </button>
+                        <button onClick={() => window.location.reload()} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Reload App</button>
                     </div>
                 </div>
             );
@@ -141,67 +124,82 @@
           const [searchTerm, setSearchTerm] = React.useState("");
           const [loading, setLoading] = React.useState(true);
           const [error, setError] = React.useState(null);
+          
+          // --- ADMIN STATE ---
+          const [currentUser, setCurrentUser] = React.useState(null);
+          // CHECK IF EMAIL IS IN THE ALLOWED LIST
+          const isAdmin = currentUser && ADMIN_EMAILS.includes(currentUser.email);
 
-          // Check if config is still default
           const isConfigured = firebaseConfig.projectId !== "your-project-id" && !firebaseConfig.apiKey.includes("PASTE");
 
-          if (!isConfigured) {
-              return <ConfigScreen />;
-          }
-
-          // 1. LISTEN TO DATABASE
           React.useEffect(() => {
+            if (!isConfigured) return; 
+            
+            // Listen for Auth Changes
+            if (auth) {
+                auth.onAuthStateChanged(user => {
+                    setCurrentUser(user);
+                });
+            }
+
             if (!docRef) return; 
 
             const unsubscribe = docRef.onSnapshot((doc) => {
                 if (doc.exists) {
-                    // Database has data, load it
                     setParticipants(doc.data().guests);
                     setLoading(false);
                 } else {
-                    // Database is empty (first run), initialize it
                     docRef.set({ guests: initialParticipants })
-                        .then(() => console.log("Database initialized"))
-                        .catch(err => {
-                            console.error("Set Error:", err);
-                            setError(err.message);
-                            setLoading(false);
-                        });
+                        .then(() => setLoading(false))
+                        .catch(err => { setError(err.message); setLoading(false); });
                 }
             }, (err) => {
-                console.error("Sync error:", err);
-                // Handle the specific "permission-denied" or "not found" error
-                if (err.message.includes("permission-denied") || err.code === "permission-denied") {
-                    setError("PERMISSION DENIED: Did you create the Database in the Firebase Console? (Build -> Firestore Database -> Create -> Start in Test Mode)");
-                } else if (err.message.includes("project-not-found") || err.code === "project-not-found") {
-                     setError("PROJECT NOT FOUND: Check your projectId in the config.");
+                if (err.message.includes("permission-denied")) {
+                    setError("PERMISSION DENIED: Check Firebase Console -> Firestore Database -> Rules/Test Mode.");
                 } else {
                     setError(err.message);
                 }
                 setLoading(false);
             });
-
             return () => unsubscribe();
-          }, []);
+          }, [isConfigured]);
 
-          // 2. UPDATE DATABASE ON CHANGE
+          // --- ADMIN ACTION HANDLER ---
+          const handleLogin = async () => {
+              if (currentUser) {
+                  auth.signOut();
+              } else {
+                  try {
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    await auth.signInWithPopup(provider);
+                  } catch (e) {
+                      if (e.code === 'auth/operation-not-allowed') {
+                          alert("Error: You must enable 'Google' in Firebase Console -> Build -> Authentication.");
+                      } else {
+                          alert("Login failed: " + e.message);
+                      }
+                  }
+              }
+          };
+
           const togglePaid = (id) => {
-            // Optimistic update (update UI immediately)
+            if (!isAdmin) {
+                alert(`🔒 Admin Access Required.\n\nOnly authorized admins can edit.\nClick the Lock icon to log in.`);
+                return;
+            }
             const updatedList = participants.map(p => 
                p.id === id ? { ...p, paid: !p.paid } : p
             );
-            setParticipants(updatedList); // Update UI
-            
-            // Send to Cloud
-            if(docRef) {
-                docRef.update({ guests: updatedList }).catch(err => {
-                    alert("Error saving: " + err.message);
-                });
-            }
+            setParticipants(updatedList);
+            if(docRef) docRef.update({ guests: updatedList }).catch(err => alert("Save error: " + err.message));
           };
 
           const markAll = (status) => {
-             if (confirm(`Mark filtered users as ${status ? 'PAID' : 'UNPAID'}? This saves to the cloud immediately.`)) {
+             if (!isAdmin) {
+                alert("🔒 Admin Access Required.");
+                return;
+             }
+             if (confirm(`Mark filtered users as ${status ? 'PAID' : 'UNPAID'}?`)) {
                 const updatedList = participants.map(p => {
                     if (p.name.toLowerCase().includes(searchTerm.toLowerCase())) {
                         return { ...p, paid: status };
@@ -227,7 +225,6 @@
             document.body.removeChild(link);
           };
 
-          // Filter logic
           const filteredParticipants = participants.filter(p => 
             p.name.toLowerCase().includes(searchTerm.toLowerCase())
           );
@@ -236,41 +233,50 @@
           const totalCount = participants.length;
           const progress = totalCount > 0 ? (totalPaid / totalCount) * 100 : 0;
 
-          if (loading) return <div className="h-screen flex items-center justify-center text-gray-500 font-medium">Connecting to Cloud...</div>;
-          
-          if (error) return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
-                <div className="bg-white p-8 rounded-xl shadow-lg border-2 border-red-100 max-w-lg">
-                    <div className="text-red-500 mb-4 flex justify-center"><IconAlert size={48} /></div>
-                    <h2 className="text-xl font-bold text-red-700 mb-2">Connection Error</h2>
-                    <p className="text-gray-700 mb-4 font-mono text-sm bg-gray-100 p-3 rounded text-left break-words">{error}</p>
-                    <p className="text-sm text-gray-500">Double check that you selected <b>"Start in Test Mode"</b> when creating the database in the Firebase Console.</p>
-                </div>
-            </div>
-          );
+          if (!isConfigured) return <ConfigScreen />;
+          if (loading) return <div className="h-screen flex items-center justify-center text-gray-500 font-medium">Connecting...</div>;
+          if (error) return <div className="min-h-screen flex items-center justify-center text-red-600 p-4"><b>Error:</b> {error}</div>;
 
           return (
             <div className="min-h-screen p-4 sm:p-8 font-sans text-gray-800">
               <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-xl overflow-hidden border border-gray-100">
                 
-                {/* Header Section */}
-                <div className="bg-gradient-to-r from-red-600 to-green-700 p-6 text-white">
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-red-600 to-green-700 p-6 text-white relative">
+                  
+                  {/* ADMIN BUTTON */}
+                  <div className="absolute top-6 right-6 flex flex-col items-end gap-2">
+                     <button onClick={handleLogin} className={`flex items-center gap-2 px-3 py-2 rounded-full transition-colors text-xs font-bold shadow-sm ${isAdmin ? 'bg-white text-green-700 hover:bg-green-50' : 'bg-black/30 text-white hover:bg-black/40'}`} title={currentUser ? "Click to Logout" : "Admin Login"}>
+                        {currentUser ? (
+                            <>
+                                <IconUnlock size={14} />
+                                {isAdmin ? "ADMIN ON" : "VIEWER"}
+                            </>
+                        ) : (
+                            <>
+                                <IconLock size={14} />
+                                ADMIN LOGIN
+                            </>
+                        )}
+                     </button>
+                     {currentUser && !isAdmin && (
+                         <div className="text-[10px] bg-red-500 text-white px-2 py-1 rounded">Not Authorized</div>
+                     )}
+                  </div>
+
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pr-12">
                     <div>
                       <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
                         🎄 CEC Christmas Party
                       </h1>
                       <div className="flex items-center gap-2 text-red-100 mt-1 opacity-90 text-sm">
                          <IconCloud size={16} /> 
-                         <span>Live Cloud Sync Active</span>
+                         <span>Live Sync</span>
                       </div>
                     </div>
-                    <button onClick={exportToCSV} className="bg-white text-green-700 hover:bg-gray-100 px-4 py-2 rounded-lg font-semibold shadow-sm flex items-center gap-2 transition-all active:scale-95">
-                      <IconDownload size={18} /> Export
-                    </button>
                   </div>
 
-                  {/* Stats Bar */}
+                  {/* Stats */}
                   <div className="mt-6 bg-black/20 rounded-lg p-4 flex flex-wrap gap-6 items-center">
                     <div className="flex items-center gap-3">
                       <div className="bg-white/20 p-2 rounded-full"><IconUsers size={20} className="text-white" /></div>
@@ -280,31 +286,36 @@
                       <div className="bg-green-500/30 p-2 rounded-full"><IconCheckCircle size={20} className="text-green-300" /></div>
                       <div><p className="text-xs text-gray-200 uppercase tracking-wider font-semibold">Paid</p><p className="text-xl font-bold">{totalPaid}</p></div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="bg-red-500/30 p-2 rounded-full"><IconXCircle size={20} className="text-red-300" /></div>
-                      <div><p className="text-xs text-gray-200 uppercase tracking-wider font-semibold">Unpaid</p><p className="text-xl font-bold">{totalCount - totalPaid}</p></div>
-                    </div>
                   </div>
                   
-                  {/* Progress Bar */}
+                  {/* Progress */}
                   <div className="mt-4 w-full bg-black/20 rounded-full h-2.5">
                     <div className="bg-green-400 h-2.5 rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%` }}></div>
                   </div>
                 </div>
 
-                {/* Controls Section */}
+                {/* Controls */}
                 <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row gap-4 justify-between items-center sticky top-0 z-10 shadow-sm">
                   <div className="relative w-full sm:w-72">
                     <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"><IconSearch size={18} /></div>
-                    <input type="text" placeholder="Find a guest..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" />
+                    <input type="text" placeholder="Find a guest..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all" />
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
-                    <button onClick={() => markAll(true)} className="flex-1 sm:flex-none px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded transition-colors">Mark Visible Paid</button>
-                    <button onClick={() => markAll(false)} className="flex-1 sm:flex-none px-3 py-1.5 text-xs font-medium text-gray-600 bg-white hover:bg-gray-50 border border-gray-200 rounded transition-colors">Reset Visible</button>
+                    {/* Admin Actions */}
+                    {isAdmin ? (
+                        <>
+                            <button onClick={() => markAll(true)} className="flex-1 sm:flex-none px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded transition-colors">Mark Visible Paid</button>
+                            <button onClick={() => markAll(false)} className="flex-1 sm:flex-none px-3 py-1.5 text-xs font-medium text-gray-600 bg-white hover:bg-gray-50 border border-gray-200 rounded transition-colors">Reset</button>
+                        </>
+                    ) : (
+                        <button onClick={exportToCSV} className="flex-1 sm:flex-none px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded transition-colors flex items-center justify-center gap-1">
+                            <IconDownload size={14} /> Export CSV
+                        </button>
+                    )}
                   </div>
                 </div>
 
-                {/* List Section */}
+                {/* List */}
                 <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
                   <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50 sticky top-0 z-0">
@@ -323,7 +334,7 @@
                             <td className="p-4 text-right">
                               <div className="flex items-center justify-end gap-3">
                                 <span className={`text-xs font-bold px-2 py-1 rounded-full ${p.paid ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-50 text-red-600 border border-red-100'}`}>{p.paid ? 'PAID' : 'UNPAID'}</span>
-                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${p.paid ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300 group-hover:border-green-400'}`}>
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${p.paid ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'} ${isAdmin ? 'group-hover:border-green-400' : 'opacity-50'}`}>
                                   {p.paid && <IconCheckCircle size={14} className="text-white" />}
                                 </div>
                               </div>
