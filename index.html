@@ -32,14 +32,14 @@
     <script type="text/babel">
         // --- PASTE YOUR FIREBASE CONFIG HERE ---
         // REMINDER: When you update the code, you must PASTE YOUR KEYS HERE AGAIN!
-    const firebaseConfig = {
-      apiKey: "AIzaSyCa0fXdn9G4pKLGU7ZfQjjO1MizhaXUPZo",
-      authDomain: "cec-party.firebaseapp.com",
-      projectId: "cec-party",
-      storageBucket: "cec-party.firebasestorage.app",
-      messagingSenderId: "257743233938",
-      appId: "1:257743233938:web:f38d4a0409e987f30bd74b",
-      measurementId: "G-CNH0NVN1MJ"
+const firebaseConfig = {
+  apiKey: "AIzaSyCa0fXdn9G4pKLGU7ZfQjjO1MizhaXUPZo",
+  authDomain: "cec-party.firebaseapp.com",
+  projectId: "cec-party",
+  storageBucket: "cec-party.firebasestorage.app",
+  messagingSenderId: "257743233938",
+  appId: "1:257743233938:web:f38d4a0409e987f30bd74b",
+  measurementId: "G-CNH0NVN1MJ"
 };
 
         // --- ADMIN SETUP ---
@@ -146,7 +146,28 @@
 
             const unsubscribe = docRef.onSnapshot((doc) => {
                 if (doc.exists) {
-                    setParticipants(doc.data().guests);
+                    // --- SMART SYNC LOGIC ---
+                    const dbGuests = doc.data().guests || [];
+                    
+                    // 1. Capture the paid status of existing people from the Cloud
+                    const paymentStatusMap = new Map(dbGuests.map(g => [g.name, g.paid]));
+                    
+                    // 2. Re-build the list using the Code (rawList) as the master template
+                    const syncedList = rawList.map((name, index) => ({
+                        id: index,
+                        name: name,
+                        // If they exist in DB, keep their payment status. If new, default to false.
+                        paid: paymentStatusMap.has(name) ? paymentStatusMap.get(name) : false
+                    }));
+
+                    // 3. If the list size or data changed (e.g. you added new names), update the Cloud automatically
+                    if (JSON.stringify(dbGuests) !== JSON.stringify(syncedList)) {
+                         console.log("Detected new guests in code. Syncing to cloud...");
+                         setParticipants(syncedList);
+                         docRef.update({ guests: syncedList });
+                    } else {
+                        setParticipants(dbGuests);
+                    }
                     setLoading(false);
                 } else {
                     docRef.set({ guests: initialParticipants })
